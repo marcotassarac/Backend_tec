@@ -1,0 +1,12 @@
+# Maven / Spring Boot
+target/
+*.class
+data/
+*.mv.db
+*.trace.db
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
