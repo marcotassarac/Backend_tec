@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,9 +24,11 @@ public class MovimientoController {
     }
 
     @PostMapping
-    public ResponseEntity<MovimientoResponse> registrar(@Valid @RequestBody MovimientoRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<MovimientoResponse> registrar(@Valid @RequestBody MovimientoRequest request,
+                                                          HttpServletRequest httpRequest,
+                                                          @AuthenticationPrincipal Jwt jwt) {
         String bearerToken = httpRequest.getHeader("Authorization");
-        String usuario = (String) httpRequest.getAttribute("username");
+        String usuario = jwt.getSubject();
         MovimientoResponse response = inventoryService.registrarMovimiento(request, bearerToken, usuario);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
