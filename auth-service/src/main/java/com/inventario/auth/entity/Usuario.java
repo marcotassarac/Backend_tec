@@ -40,6 +40,15 @@ public class Usuario {
     @Builder.Default
     private boolean activo = true;
 
+    /** Secreto compartido (Base32) usado para validar los codigos TOTP del segundo factor. */
+    @Column(name = "totp_secret", length = 64)
+    private String totpSecret;
+
+    /** Indica si el usuario ya confirmo el segundo factor y este se exige en cada login. */
+    @Column(name = "totp_enabled", nullable = false)
+    @Builder.Default
+    private boolean totpEnabled = false;
+
     @Column(name = "fecha_creacion", nullable = false)
     @Builder.Default
     private LocalDateTime fechaCreacion = LocalDateTime.now();

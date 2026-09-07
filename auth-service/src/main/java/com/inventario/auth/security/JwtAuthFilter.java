@@ -23,7 +23,7 @@ import java.util.List;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private static final List<String> PUBLIC_PATHS = List.of("/api/auth/login", "/h2-console");
+    private static final List<String> PUBLIC_PATHS = List.of("/api/auth/login", "/api/auth/2fa/verify", "/h2-console");
 
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
