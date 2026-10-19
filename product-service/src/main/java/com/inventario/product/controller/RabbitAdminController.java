@@ -1,7 +1,6 @@
 package com.inventario.product.controller;
 
-import org.springframework.amqp.core.AmqpAdmin;
-import org.springframework.amqp.core.QueueBuilder;
+import com.inventario.product.service.RabbitAdminService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,22 +12,22 @@ import java.util.Map;
 @RequestMapping("/api/v1/admin/rabbitmq/queues")
 public class RabbitAdminController {
 
-    private final AmqpAdmin amqpAdmin;
+    private final RabbitAdminService rabbitAdminService;
 
-    public RabbitAdminController(AmqpAdmin amqpAdmin) {
-        this.amqpAdmin = amqpAdmin;
+    public RabbitAdminController(RabbitAdminService rabbitAdminService) {
+        this.rabbitAdminService = rabbitAdminService;
     }
 
     @PostMapping("/{queueName}")
     public ResponseEntity<Map<String, String>> crearCola(@PathVariable String queueName) {
-        String nombre = amqpAdmin.declareQueue(QueueBuilder.durable(queueName).build());
+        String nombre = rabbitAdminService.crearCola(queueName);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("queue", nombre, "status", "creada"));
     }
 
     @DeleteMapping("/{queueName}")
     public ResponseEntity<Void> eliminarCola(@PathVariable String queueName) {
-        amqpAdmin.deleteQueue(queueName);
+        rabbitAdminService.eliminarCola(queueName);
         return ResponseEntity.noContent().build();
     }
 }
