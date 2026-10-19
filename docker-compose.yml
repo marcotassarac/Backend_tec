@@ -1,0 +1,46 @@
+services:
+  rabbitmq1:
+    image: rabbitmq:3-management
+    container_name: rabbitmq1
+    hostname: rabbitmq1
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "PEDIDOS360_COOKIE"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rabbitmq-cluster
+
+  rabbitmq2:
+    image: rabbitmq:3-management
+    container_name: rabbitmq2
+    hostname: rabbitmq2
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "PEDIDOS360_COOKIE"
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    depends_on:
+      rabbitmq1:
+        condition: service_healthy
+    # Arranca el nodo y lo une al cluster de rabbitmq1
+    command: >
+      bash -c "docker-entrypoint.sh rabbitmq-server &
+      PID=$$!;
+      rabbitmqctl await_startup &&
+      rabbitmqctl stop_app &&
+      rabbitmqctl reset &&
+      rabbitmqctl join_cluster rabbit@rabbitmq1 &&
+      rabbitmqctl start_app;
+      wait $$PID"
+    networks:
+      - rabbitmq-cluster
+
+networks:
+  rabbitmq-cluster:
+    driver: bridge
