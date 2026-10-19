@@ -32,11 +32,11 @@ services:
     command: >
       bash -c "docker-entrypoint.sh rabbitmq-server &
       PID=$$!;
-      rabbitmqctl await_startup &&
-      rabbitmqctl stop_app &&
-      rabbitmqctl reset &&
-      rabbitmqctl join_cluster rabbit@rabbitmq1 &&
-      rabbitmqctl start_app;
+      until gosu rabbitmq rabbitmqctl -q await_startup; do sleep 2; done;
+      gosu rabbitmq rabbitmqctl stop_app &&
+      gosu rabbitmq rabbitmqctl reset &&
+      gosu rabbitmq rabbitmqctl join_cluster rabbit@rabbitmq1 &&
+      gosu rabbitmq rabbitmqctl start_app;
       wait $$PID"
     networks:
       - rabbitmq-cluster
