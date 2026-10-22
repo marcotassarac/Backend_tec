@@ -2,7 +2,11 @@ package com.inventario.auth.service;
 
 import com.inventario.auth.dto.LoginRequest;
 import com.inventario.auth.dto.LoginResponse;
+import com.inventario.auth.dto.TwoFactorCodeRequest;
+import com.inventario.auth.dto.TwoFactorSetupResponse;
+import com.inventario.auth.dto.TwoFactorStatusResponse;
 import com.inventario.auth.dto.TwoFactorVerifyRequest;
+import com.inventario.auth.dto.UsuarioResponse;
 import com.inventario.auth.entity.RolUsuario;
 import com.inventario.auth.entity.Usuario;
 import com.inventario.auth.exception.BadCredentialsException;
@@ -142,6 +146,21 @@ class AuthServiceTest {
     }
 
     @Test
+    void verificarSegundoFactor_conUsuarioBorradoDespuesDelPrimerFactor_debeLanzarBadCredentialsException() {
+        Usuario usuario = usuarioBase(true);
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuario));
+        LoginResponse primerFactor = authService.login(new LoginRequest("operador", "clave123"));
+
+        // Simula que el usuario fue eliminado entre el primer y el segundo factor.
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.verificarSegundoFactor(
+                new TwoFactorVerifyRequest(primerFactor.getPendingSessionId(), "123456")))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Usuario no encontrado");
+    }
+
+    @Test
     void verificarSegundoFactor_conSessionIdInexistente_debeLanzarBadCredentialsException() {
         assertThatThrownBy(() -> authService.verificarSegundoFactor(
                 new TwoFactorVerifyRequest("sesion-que-no-existe", "123456")))
@@ -167,6 +186,120 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.verificarSegundoFactor(intentoFallido))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("expiro");
+    }
+
+    @Test
+    void iniciarConfiguracionSegundoFactor_debeGenerarSecretoYQr() {
+        Usuario usuario = usuarioBase(false);
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuario));
+
+        TwoFactorSetupResponse response = authService.iniciarConfiguracionSegundoFactor("operador");
+
+        assertThat(response.getSecret()).isNotBlank();
+        assertThat(response.getOtpAuthUrl()).startsWith("otpauth://totp/");
+        assertThat(response.getQrCodeImageBase64()).startsWith("data:image/png;base64,");
+        assertThat(usuario.getTotpSecret()).isEqualTo(response.getSecret());
+        assertThat(usuario.isTotpEnabled()).isFalse();
+    }
+
+    @Test
+    void iniciarConfiguracionSegundoFactor_conUsuarioInexistente_debeLanzarBadCredentialsException() {
+        when(usuarioRepository.findByUsername("fantasma")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.iniciarConfiguracionSegundoFactor("fantasma"))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("no encontrado");
+    }
+
+    @Test
+    void confirmarSegundoFactor_conCodigoCorrecto_debeActivarTotp() {
+        Usuario usuario = usuarioBase(false);
+        usuario.setTotpSecret(totpService.generarSecreto());
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuario));
+
+        String codigoReal = generarCodigoParaStepActualEstatico(usuario.getTotpSecret());
+        TwoFactorStatusResponse response = authService.confirmarSegundoFactor("operador",
+                new TwoFactorCodeRequest(codigoReal));
+
+        assertThat(response.isTotpEnabled()).isTrue();
+        assertThat(usuario.isTotpEnabled()).isTrue();
+    }
+
+    @Test
+    void confirmarSegundoFactor_sinSecretoPrevio_debeLanzarBadCredentialsException() {
+        Usuario usuario = usuarioBase(false);
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuario));
+
+        assertThatThrownBy(() -> authService.confirmarSegundoFactor("operador", new TwoFactorCodeRequest("123456")))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("iniciar la configuracion");
+    }
+
+    @Test
+    void confirmarSegundoFactor_conCodigoIncorrecto_debeLanzarBadCredentialsException() {
+        Usuario usuario = usuarioBase(false);
+        usuario.setTotpSecret(totpService.generarSecreto());
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuario));
+
+        assertThatThrownBy(() -> authService.confirmarSegundoFactor("operador", new TwoFactorCodeRequest("000000")))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Codigo incorrecto");
+    }
+
+    @Test
+    void desactivarSegundoFactor_debeLimpiarSecretoYDeshabilitarTotp() {
+        Usuario usuario = usuarioBase(true);
+        usuario.setTotpSecret("SECRETOPREVIO");
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuario));
+
+        TwoFactorStatusResponse response = authService.desactivarSegundoFactor("operador");
+
+        assertThat(response.isTotpEnabled()).isFalse();
+        assertThat(usuario.isTotpEnabled()).isFalse();
+        assertThat(usuario.getTotpSecret()).isNull();
+    }
+
+    @Test
+    void obtenerEstadoSegundoFactor_debeReflejarElEstadoActualDelUsuario() {
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuarioBase(true)));
+
+        TwoFactorStatusResponse response = authService.obtenerEstadoSegundoFactor("operador");
+
+        assertThat(response.isTotpEnabled()).isTrue();
+    }
+
+    @Test
+    void getByUsername_debeRetornarLosDatosPublicosDelUsuario() {
+        when(usuarioRepository.findByUsername("operador")).thenReturn(Optional.of(usuarioBase(false)));
+
+        UsuarioResponse response = authService.getByUsername("operador");
+
+        assertThat(response.getUsername()).isEqualTo("operador");
+        assertThat(response.getRol()).isEqualTo("OPERADOR");
+        assertThat(response.isActivo()).isTrue();
+    }
+
+    @Test
+    void getByUsername_conUsuarioInexistente_debeLanzarBadCredentialsException() {
+        when(usuarioRepository.findByUsername("fantasma")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.getByUsername("fantasma"))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("no encontrado");
+    }
+
+    private static String generarCodigoParaStepActualEstatico(String secretoBase32) {
+        try {
+            long currentStep = System.currentTimeMillis() / 1000L / 30L;
+            org.apache.commons.codec.binary.Base32 base32 = new org.apache.commons.codec.binary.Base32();
+            byte[] secretBytes = base32.decode(secretoBase32);
+
+            Method metodo = TotpService.class.getDeclaredMethod("generarCodigoParaStep", byte[].class, long.class);
+            metodo.setAccessible(true);
+            return (String) metodo.invoke(new TotpService(), secretBytes, currentStep);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     private String generarCodigoParaStepActual(String secretoBase32) throws Exception {

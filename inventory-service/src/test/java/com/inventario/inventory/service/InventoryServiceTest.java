@@ -115,4 +115,13 @@ class InventoryServiceTest {
 
         verify(movimientoRepository).findAllByOrderByFechaDesc();
     }
+
+    @Test
+    void listar_conFiltroDeProducto_debeConsultarSoloEseProducto() {
+        when(movimientoRepository.findByProductoIdOrderByFechaDesc(1L)).thenReturn(java.util.List.of());
+
+        inventoryService.listar(1L);
+
+        verify(movimientoRepository).findByProductoIdOrderByFechaDesc(1L);
+    }
 }

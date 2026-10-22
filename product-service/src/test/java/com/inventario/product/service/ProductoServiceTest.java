@@ -12,15 +12,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -86,6 +90,18 @@ class ProductoServiceTest {
     }
 
     @Test
+    void obtenerPorId_conIdExistente_debeRetornarElProducto() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findById(1L)).thenReturn(Optional.of(producto));
+
+        ProductoResponse response = productoService.obtenerPorId(1L, null);
+
+        assertThat(response.getCodigo()).isEqualTo("PROD-100");
+    }
+
+    @Test
     void ajustarStock_salidaConStockSuficiente_debeDescontarCorrectamente() {
         productoService = buildService();
         Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
@@ -146,5 +162,129 @@ class ProductoServiceTest {
         assertThatThrownBy(() -> productoService.actualizar(2L, request))
                 .as("actualizar() deberia validar codigo duplicado igual que crear(), pero hoy no lo hace")
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void listar_conBearerToken_debeConsultarElNombreDeCategoriaParaCadaProducto() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .categoriaId(5L).precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findAll()).thenReturn(List.of(producto));
+        when(categoryClient.obtenerNombreCategoria(5L, "Bearer token-x")).thenReturn("Perifericos");
+
+        List<ProductoResponse> resultado = productoService.listar("Bearer token-x");
+
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).getCategoriaNombre()).isEqualTo("Perifericos");
+    }
+
+    @Test
+    void listar_sinBearerToken_noDebeConsultarElNombreDeCategoria() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .categoriaId(5L).precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findAll()).thenReturn(List.of(producto));
+
+        List<ProductoResponse> resultado = productoService.listar(null);
+
+        assertThat(resultado.get(0).getCategoriaNombre()).isNull();
+    }
+
+    @Test
+    void eliminar_conIdExistente_debeBorrarElProducto() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findById(1L)).thenReturn(Optional.of(producto));
+
+        productoService.eliminar(1L);
+
+        verify(productoRepository).delete(producto);
+    }
+
+    @Test
+    void ajustarStock_entrada_debeSumarAlStockActual() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findById(1L)).thenReturn(Optional.of(producto));
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductoResponse response = productoService.ajustarStock(1L, new AjusteStockRequest("ENTRADA", 5));
+
+        assertThat(response.getStock()).isEqualTo(15);
+    }
+
+    @Test
+    void ajustarStock_dejandoStockPorDebajoDelMinimo_debeMarcarStockBajo() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .precio(BigDecimal.TEN).stock(5).stockMinimo(10).activo(true).build();
+        when(productoRepository.findById(1L)).thenReturn(Optional.of(producto));
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductoResponse response = productoService.ajustarStock(1L, new AjusteStockRequest("ENTRADA", 1));
+
+        assertThat(response.isStockBajo()).isTrue();
+    }
+
+    @Test
+    void crear_conActivoNulo_debeQuedarActivoPorDefecto() {
+        productoService = buildService();
+        ProductoRequest request = new ProductoRequest("PROD-100", "Teclado", null, 1L,
+                BigDecimal.valueOf(25000), 10, 2, null);
+        when(productoRepository.existsByCodigoIgnoreCase("PROD-100")).thenReturn(false);
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductoResponse response = productoService.crear(request);
+
+        assertThat(response.isActivo()).isTrue();
+    }
+
+    @Test
+    void crear_conActivoFalse_debeRespetarloComoInactivo() {
+        productoService = buildService();
+        ProductoRequest request = new ProductoRequest("PROD-100", "Teclado", null, 1L,
+                BigDecimal.valueOf(25000), 10, 2, false);
+        when(productoRepository.existsByCodigoIgnoreCase("PROD-100")).thenReturn(false);
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductoResponse response = productoService.crear(request);
+
+        assertThat(response.isActivo()).isFalse();
+    }
+
+    @Test
+    void actualizar_conActivoNulo_noDebeModificarElEstadoActivo() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findById(1L)).thenReturn(Optional.of(producto));
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+        ProductoRequest request = new ProductoRequest("PROD-100", "Teclado", null, 1L,
+                BigDecimal.TEN, 10, 2, null);
+
+        ProductoResponse response = productoService.actualizar(1L, request);
+
+        assertThat(response.isActivo()).isTrue();
+    }
+
+    @Test
+    void crear_cuandoRabbitMqNoEstaDisponible_noDebeFallarLaCreacion() {
+        productoService = buildService();
+        ProductoRequest request = new ProductoRequest("PROD-100", "Teclado", null, 1L,
+                BigDecimal.valueOf(25000), 10, 2, true);
+        when(productoRepository.existsByCodigoIgnoreCase("PROD-100")).thenReturn(false);
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> {
+            Producto p = inv.getArgument(0);
+            p.setId(1L);
+            return p;
+        });
+        doThrow(new AmqpException("broker caido") {}).when(rabbitTemplate)
+                .convertAndSend(anyString(), anyString(), any(Object.class));
+
+        ProductoResponse response = productoService.crear(request);
+
+        assertThat(response.getId()).isEqualTo(1L);
     }
 }

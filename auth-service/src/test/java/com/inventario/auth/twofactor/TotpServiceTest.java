@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Pruebas unitarias de TotpService (RFC 6238). Para validar verificarCodigo() con un
@@ -62,6 +63,40 @@ class TotpServiceTest {
         assertThat(totpService.verificarCodigo(secreto, "12345")).isFalse();
         assertThat(totpService.verificarCodigo(secreto, "abcdef")).isFalse();
         assertThat(totpService.verificarCodigo(secreto, null)).isFalse();
+    }
+
+    @Test
+    void generarQrBase64_debeProducirUnaImagenPngEnBase64() {
+        String otpAuthUrl = totpService.generarOtpAuthUrl("operador", "JBSWY3DPEHPK3PXP");
+
+        String qr = totpService.generarQrBase64(otpAuthUrl);
+
+        assertThat(qr).startsWith("data:image/png;base64,");
+        assertThat(qr.length()).isGreaterThan("data:image/png;base64,".length());
+    }
+
+    @Test
+    void generarQrBase64_conUnaUrlQueExcedeLaCapacidadDelCodigoQr_debeLanzarIllegalStateException() {
+        String urlDemasiadoLarga = "otpauth://totp/x?secret=" + "A".repeat(5000);
+
+        assertThatThrownBy(() -> totpService.generarQrBase64(urlDemasiadoLarga))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No fue posible generar el codigo QR");
+    }
+
+    @Test
+    void generarCodigoParaStep_conUnaLlaveVacia_debeLanzarIllegalStateException() throws Exception {
+        Method metodo = TotpService.class.getDeclaredMethod("generarCodigoParaStep", byte[].class, long.class);
+        metodo.setAccessible(true);
+
+        assertThatThrownBy(() -> {
+            try {
+                metodo.invoke(totpService, new byte[0], 1L);
+            } catch (java.lang.reflect.InvocationTargetException ex) {
+                throw ex.getCause();
+            }
+        }).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Error calculando el codigo TOTP");
     }
 
     /** Invoca por reflexion el algoritmo privado real para obtener el codigo del paso actual. */

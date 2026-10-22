@@ -86,10 +86,10 @@ real (no simulado). Detalle completo e informe de evidencias en
 
 | Prueba | Herramienta | Resultado |
 |---|---|---|
-| Unitarias y de integracion | JUnit 5 + Mockito + AssertJ + `@DataJpaTest` (H2) | 38/40 pasan (2 fallas intencionales exponen un bug real) |
+| Unitarias y de integracion | JUnit 5 + Mockito + AssertJ + `@DataJpaTest` (H2) | 196/198 pasan (2 fallas intencionales exponen un bug real); 100% de cobertura real (JaCoCo) en los 5 servicios |
 | Analisis estatico de codigo | SonarQube Community Edition (Docker) | 0 bugs / 0 code smells / 0% duplicacion en 5 servicios; 1 hallazgo real de seguridad |
 | Vulnerabilidades | OWASP ZAP (`zap-baseline.py`, Docker) | 0 hallazgos criticos/altos en frontend y `auth-service` |
-| Automatizadas (E2E) | Selenium WebDriver 4.23 + Chrome headless (`selenium-tests/`) | 4/4 pasan, navegador real controlado |
+| Automatizadas (E2E) | Selenium WebDriver 4.23 + Chrome headless (`selenium-tests/`) | 8/8 pasan, navegador real controlado |
 | Carga y estres | k6 (Grafana, Docker) | 1.025 peticiones, 0% error, p95 = 36,8 ms con 25 usuarios concurrentes |
 
 **Como correr cada una:**
@@ -128,4 +128,4 @@ docker run --rm -v "<carpeta-del-script>:/scripts" grafana/k6 run /scripts/carga
    cookies de sesion; HMAC-SHA1 es el algoritmo que exige el propio estandar RFC 6238 de TOTP) —
    el detalle de cada justificacion esta en el informe.
 
-Flujo completo de GitHub Actions ya configurado en [`.github/workflows/tests.yml`](.github/workflows/tests.yml) para correr los 40 tests JUnit automaticamente en cada push/PR.
+Flujo completo de GitHub Actions ya configurado en [`.github/workflows/tests.yml`](.github/workflows/tests.yml) para correr los 198 tests JUnit automaticamente en cada push/PR.
