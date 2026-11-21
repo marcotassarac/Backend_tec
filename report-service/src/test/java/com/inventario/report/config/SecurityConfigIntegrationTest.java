@@ -29,7 +29,8 @@ import static org.mockito.Mockito.when;
  * invocando el metodo privado directamente, misma tecnica de reflexion que ya usa el
  * proyecto para TotpService en auth-service.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "app.kafka.listeners.auto-startup=false")
 class SecurityConfigIntegrationTest {
 
     @LocalServerPort

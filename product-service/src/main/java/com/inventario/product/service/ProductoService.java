@@ -108,7 +108,8 @@ public class ProductoService {
 
     /**
      * Simula un evento de dominio enviandolo a cola.inventario y cola.notificaciones
-     * por pedidos.direct. Si RabbitMQ no esta disponible solo se registra el error,
+     * por pedidos.direct, y a cola.auditoria por pedidos.topic (auditoria.producto.<tipo>).
+     * Si RabbitMQ no esta disponible solo se registra el error,
      * para no hacer fallar una operacion que ya quedo guardada.
      */
     private void publicarEvento(String tipo, Producto producto) {
@@ -123,6 +124,8 @@ public class ProductoService {
         try {
             rabbitTemplate.convertAndSend(RabbitMQConfig.DIRECT_EXCHANGE, RabbitMQConfig.COLA_INVENTARIO, evento);
             rabbitTemplate.convertAndSend(RabbitMQConfig.DIRECT_EXCHANGE, RabbitMQConfig.COLA_NOTIFICACIONES, evento);
+            rabbitTemplate.convertAndSend(RabbitMQConfig.TOPIC_EXCHANGE,
+                    RabbitMQConfig.PREFIJO_ROUTING_AUDITORIA + tipo.toLowerCase(), evento);
             log.info("Evento {} publicado para producto {}", tipo, producto.getId());
         } catch (AmqpException ex) {
             log.error("No se pudo publicar el evento {} del producto {}: {}", tipo, producto.getId(), ex.getMessage());

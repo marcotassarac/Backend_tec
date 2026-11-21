@@ -5,12 +5,15 @@ import com.inventario.inventory.dto.MovimientoRequest;
 import com.inventario.inventory.dto.MovimientoResponse;
 import com.inventario.inventory.dto.ProductoDto;
 import com.inventario.inventory.entity.MovimientoInventario;
+import com.inventario.inventory.event.MovimientoEvent;
 import com.inventario.inventory.exception.BusinessException;
 import com.inventario.inventory.exception.ResourceNotFoundException;
+import com.inventario.inventory.producer.MovimientoEventPublisher;
 import com.inventario.inventory.repository.MovimientoInventarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -39,6 +42,9 @@ class InventoryServiceTest {
 
     @Mock
     private ProductClient productClient;
+
+    @Mock
+    private MovimientoEventPublisher eventPublisher;
 
     @InjectMocks
     private InventoryService inventoryService;
@@ -73,6 +79,17 @@ class InventoryServiceTest {
         assertThat(response.getStockResultante()).isEqualTo(15);
         assertThat(response.getUsuario()).isEqualTo("operador");
         verify(movimientoRepository).save(any(MovimientoInventario.class));
+
+        ArgumentCaptor<MovimientoEvent> evento = ArgumentCaptor.forClass(MovimientoEvent.class);
+        verify(eventPublisher).publicar(evento.capture());
+        assertThat(evento.getValue().eventId()).isNotBlank();
+        assertThat(evento.getValue().tipoEvento()).isEqualTo(MovimientoEvent.TIPO_MOVIMIENTO_REGISTRADO);
+        assertThat(evento.getValue().movimientoId()).isEqualTo(100L);
+        assertThat(evento.getValue().productoId()).isEqualTo(1L);
+        assertThat(evento.getValue().tipoMovimiento()).isEqualTo("ENTRADA");
+        assertThat(evento.getValue().stockResultante()).isEqualTo(15);
+        assertThat(evento.getValue().stockMinimo()).isEqualTo(5);
+        assertThat(evento.getValue().fecha()).isNotNull();
     }
 
     @Test
@@ -83,7 +100,7 @@ class InventoryServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Tipo de movimiento invalido");
 
-        verifyNoInteractions(productClient, movimientoRepository);
+        verifyNoInteractions(productClient, movimientoRepository, eventPublisher);
     }
 
     @Test

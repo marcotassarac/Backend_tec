@@ -24,6 +24,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(KafkaAdminException.class)
+    public ResponseEntity<ErrorResponse> handleKafkaAdmin(KafkaAdminException ex, HttpServletRequest request) {
+        return build(ex.getStatus(), ex.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         String message = ex.getBindingResult().getFieldErrors().stream()

@@ -78,6 +78,67 @@ Cada servicio expone su consola en `http://localhost:<puerto>/h2-console` con JD
 - Autenticacion: JWT (HS256) emitido por `auth-service`, validado de forma independiente por cada microservicio mediante un filtro (`OncePerRequestFilter`) que revisa el header `Authorization: Bearer <token>`.
 - CORS habilitado en todos los microservicios para `http://localhost:3000` (frontend).
 
+## Streaming con Kafka (DSY1107 — Evaluaciones Parciales N°5 y N°6)
+
+Kafka complementa a RabbitMQ sin reemplazarlo: RabbitMQ sigue entregando los eventos de producto a colas concretas (con DLQ), y Kafka agrega un **historial de eventos de inventario** que varios consumidores leen a su ritmo, para estadisticas en tiempo real y deteccion automatica de stock bajo.
+
+### Levantar la infraestructura
+
+```bash
+docker compose -f docker-compose.kafka.yml up -d      # 3 Zookeeper + 3 brokers (localhost:9092, 9093, 9094)
+docker compose -f docker-compose.kafka-ui.yml up -d   # Kafka UI en http://localhost:8090
+docker compose up -d                                  # cluster RabbitMQ de 2 nodos
+```
+
+Al arrancar, `product-service` crea los topicos (es el microservicio administrador de Kafka).
+
+### Flujo de eventos
+
+```
+inventory-service --(MovimientoEvent, clave=productoId)--> inventario.movimientos
+                                                              |            |
+                         grupo report-estadisticas (x3) <-----+            +-----> grupo report-detector-alertas (x3)
+                         estadisticas en vivo                                       regla BAJO / AGOTADO / NORMAL
+                         GET /api/reportes/streaming/estadisticas                            |
+                                                                                             v
+                         grupo product-alertas-stock (x3) <------------------- inventario.alertas-stock (compactado)
+                         alertas vigentes: GET /api/productos/alertas-stock
+```
+
+| Topico | Particiones / replicas | Configuracion | Por que |
+|---|---|---|---|
+| `inventario.movimientos` | 3 / 3 | `cleanup.policy=delete`, `retention.ms`=7 dias, `min.insync.replicas=2` | Historial: permite reprocesar o sumar un consumer group nuevo que lea la semana completa |
+| `inventario.alertas-stock` | 3 / 3 | `cleanup.policy=compact`, `min.compaction.lag.ms`=1 min | Estado por producto: Kafka conserva el ultimo evento de cada clave, y product-service reconstruye las alertas leyendo el topico desde el inicio |
+| `*.DLT` | 3 / 3 | `retention.ms`=14 dias | Mensajes que no se pudieron procesar, con los headers de la excepcion |
+
+- **3 particiones**: hasta 3 consumidores en paralelo por grupo (concurrencia 3 en cada listener).
+- **3 replicas + `min.insync.replicas=2` + `acks=all`**: se tolera la caida de 1 broker sin perder eventos confirmados.
+- **Clave = productoId**: todos los movimientos de un producto van a la misma particion y se procesan en orden.
+- **Productor idempotente** (`enable.idempotence=true`): los reintentos del productor no duplican eventos.
+- **Consumidores at-least-once** (`AckMode.RECORD`, auto-commit apagado) y deduplicacion por `eventId`.
+- **Errores**: `ErrorHandlingDeserializer` (JSON corrupto no bloquea la particion), 3 intentos con pausa de 1 s para errores transitorios, y los eventos invalidos van directo a `<topico>.DLT` sin reintentar.
+- Si Kafka esta caido, el registro de movimientos no falla: el productor espera como maximo 5 s y solo registra el error.
+
+### Administrador de Kafka (product-service)
+
+| Metodo | Ruta | Accion |
+|---|---|---|
+| GET | `/api/v1/admin/kafka/topics` | Listar topicos (particiones, replicas) |
+| GET | `/api/v1/admin/kafka/topics/{nombre}` | Lider, replicas e ISR por particion, y configuracion |
+| POST | `/api/v1/admin/kafka/topics` | Crear topico `{nombre, particiones, replicas, configuraciones}` |
+| PUT | `/api/v1/admin/kafka/topics/{nombre}/config` | Cambiar configuracion (retention, cleanup, etc.) |
+| PUT | `/api/v1/admin/kafka/topics/{nombre}/partitions` | Aumentar particiones |
+| DELETE | `/api/v1/admin/kafka/topics/{nombre}` | Eliminar topico |
+| GET | `/api/v1/admin/kafka/consumer-groups` | Listar consumer groups y su estado |
+| GET | `/api/v1/admin/kafka/consumer-groups/{id}` | Miembros, offsets y **lag** por particion |
+| POST | `/api/v1/admin/kafka/consumer-groups/{id}/reset-offsets` | Mover offsets a `earliest` o `latest` (grupo detenido) |
+| DELETE | `/api/v1/admin/kafka/consumer-groups/{id}` | Eliminar grupo |
+
+### RabbitMQ (se mantiene)
+
+- 3 colas con DLQ: `cola.inventario`, `cola.notificaciones` (exchange direct) y `cola.auditoria` (exchange topic, routing key `auditoria.producto.<tipo>`).
+- Administrador en `/api/v1/admin/rabbitmq`: `queues/{nombre}`, `exchanges/{nombre}?tipo=direct|topic|fanout` y `bindings` (POST/DELETE).
+
 ## Pruebas de calidad (TCY0101 — Evaluacion Parcial N°2)
 
 Se aplicaron las 5 herramientas de testing que exige la pauta de la asignatura, contra el sistema

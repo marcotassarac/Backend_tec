@@ -22,6 +22,8 @@ public class RabbitMQConfig {
     public static final String DEAD_LETTER_EXCHANGE = "pedidos.dlx";
     public static final String COLA_NOTIFICACIONES = "cola.notificaciones";
     public static final String COLA_NOTIFICACIONES_DLQ = "cola.notificaciones.dlq";
+    public static final String COLA_AUDITORIA = "cola.auditoria";
+    public static final String COLA_AUDITORIA_DLQ = "cola.auditoria.dlq";
 
     @Bean
     public DirectExchange pedidosDeadLetterExchange() {
@@ -44,6 +46,24 @@ public class RabbitMQConfig {
     @Bean
     public Binding notificacionesDlqBinding() {
         return BindingBuilder.bind(colaNotificacionesDlq()).to(pedidosDeadLetterExchange()).with(COLA_NOTIFICACIONES_DLQ);
+    }
+
+    @Bean
+    public Queue colaAuditoria() {
+        return QueueBuilder.durable(COLA_AUDITORIA)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(COLA_AUDITORIA_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue colaAuditoriaDlq() {
+        return QueueBuilder.durable(COLA_AUDITORIA_DLQ).build();
+    }
+
+    @Bean
+    public Binding auditoriaDlqBinding() {
+        return BindingBuilder.bind(colaAuditoriaDlq()).to(pedidosDeadLetterExchange()).with(COLA_AUDITORIA_DLQ);
     }
 
     /** Convierte el JSON que publica product-service a objetos Java. */

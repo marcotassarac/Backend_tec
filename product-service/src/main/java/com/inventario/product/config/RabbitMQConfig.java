@@ -15,7 +15,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Topologia de RabbitMQ para los eventos de producto:
  * - pedidos.direct: entrega a una cola concreta usando su nombre como routing key.
- * - pedidos.topic: difusion por patron (producto.#) a ambas colas.
+ * - pedidos.topic: difusion por patron (producto.#) a inventario y notificaciones, y
+ *   auditoria.# a cola.auditoria (pista de auditoria de cambios de producto).
  * - pedidos.dlx: recibe los mensajes rechazados o expirados y los deja en la DLQ de cada cola.
  */
 @Configuration
@@ -29,8 +30,12 @@ public class RabbitMQConfig {
     public static final String COLA_NOTIFICACIONES = "cola.notificaciones";
     public static final String COLA_INVENTARIO_DLQ = "cola.inventario.dlq";
     public static final String COLA_NOTIFICACIONES_DLQ = "cola.notificaciones.dlq";
+    public static final String COLA_AUDITORIA = "cola.auditoria";
+    public static final String COLA_AUDITORIA_DLQ = "cola.auditoria.dlq";
 
     public static final String TOPIC_ROUTING_PRODUCTO = "producto.#";
+    public static final String TOPIC_ROUTING_AUDITORIA = "auditoria.#";
+    public static final String PREFIJO_ROUTING_AUDITORIA = "auditoria.producto.";
 
     // ---------- Exchanges ----------
 
@@ -67,6 +72,14 @@ public class RabbitMQConfig {
                 .build();
     }
 
+    @Bean
+    public Queue colaAuditoria() {
+        return QueueBuilder.durable(COLA_AUDITORIA)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(COLA_AUDITORIA_DLQ)
+                .build();
+    }
+
     // ---------- Dead Letter Queues ----------
 
     @Bean
@@ -77,6 +90,11 @@ public class RabbitMQConfig {
     @Bean
     public Queue colaNotificacionesDlq() {
         return QueueBuilder.durable(COLA_NOTIFICACIONES_DLQ).build();
+    }
+
+    @Bean
+    public Queue colaAuditoriaDlq() {
+        return QueueBuilder.durable(COLA_AUDITORIA_DLQ).build();
     }
 
     // ---------- Bindings: direct ----------
@@ -103,6 +121,11 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(colaNotificaciones()).to(pedidosTopicExchange()).with(TOPIC_ROUTING_PRODUCTO);
     }
 
+    @Bean
+    public Binding auditoriaTopicBinding() {
+        return BindingBuilder.bind(colaAuditoria()).to(pedidosTopicExchange()).with(TOPIC_ROUTING_AUDITORIA);
+    }
+
     // ---------- Bindings: dead letter ----------
 
     @Bean
@@ -113,6 +136,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding notificacionesDlqBinding() {
         return BindingBuilder.bind(colaNotificacionesDlq()).to(pedidosDeadLetterExchange()).with(COLA_NOTIFICACIONES_DLQ);
+    }
+
+    @Bean
+    public Binding auditoriaDlqBinding() {
+        return BindingBuilder.bind(colaAuditoriaDlq()).to(pedidosDeadLetterExchange()).with(COLA_AUDITORIA_DLQ);
     }
 
     /** Serializa los eventos como JSON en vez de serializacion Java. */

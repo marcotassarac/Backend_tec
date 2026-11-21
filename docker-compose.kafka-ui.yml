@@ -1,0 +1,21 @@
+# Kafka UI para administrar brokers, topicos, particiones, mensajes y consumer groups.
+# Requiere el cluster arriba (docker-compose.kafka.yml), porque se une a su red kafka-net.
+# Levantar:  docker compose -f docker-compose.kafka-ui.yml up -d   ->  http://localhost:8090
+
+services:
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: inventario-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka1:29092,kafka2:29092,kafka3:29092"
+      KAFKA_CLUSTERS_0_ZOOKEEPER: "zookeeper1:2181,zookeeper2:2181,zookeeper3:2181"
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks: [kafka-net]
+
+networks:
+  kafka-net:
+    external: true

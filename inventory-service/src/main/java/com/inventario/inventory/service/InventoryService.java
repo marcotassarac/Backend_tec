@@ -8,10 +8,13 @@ import com.inventario.inventory.entity.MovimientoInventario;
 import com.inventario.inventory.entity.TipoMovimiento;
 import com.inventario.inventory.exception.BusinessException;
 import com.inventario.inventory.exception.ResourceNotFoundException;
+import com.inventario.inventory.event.MovimientoEvent;
+import com.inventario.inventory.producer.MovimientoEventPublisher;
 import com.inventario.inventory.repository.MovimientoInventarioRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Proceso de negocio: registrar un movimiento de inventario (entrada o salida).
@@ -23,10 +26,13 @@ public class InventoryService {
 
     private final MovimientoInventarioRepository movimientoRepository;
     private final ProductClient productClient;
+    private final MovimientoEventPublisher eventPublisher;
 
-    public InventoryService(MovimientoInventarioRepository movimientoRepository, ProductClient productClient) {
+    public InventoryService(MovimientoInventarioRepository movimientoRepository, ProductClient productClient,
+                            MovimientoEventPublisher eventPublisher) {
         this.movimientoRepository = movimientoRepository;
         this.productClient = productClient;
+        this.eventPublisher = eventPublisher;
     }
 
     public MovimientoResponse registrarMovimiento(MovimientoRequest request, String bearerToken, String usuario) {
@@ -58,7 +64,25 @@ public class InventoryService {
                 .stockResultante(actualizado.getStock())
                 .build();
 
-        return toResponse(movimientoRepository.save(movimiento));
+        MovimientoInventario guardado = movimientoRepository.save(movimiento);
+        eventPublisher.publicar(toEvent(guardado, producto.getStockMinimo()));
+        return toResponse(guardado);
+    }
+
+    private MovimientoEvent toEvent(MovimientoInventario m, Integer stockMinimo) {
+        return new MovimientoEvent(
+                UUID.randomUUID().toString(),
+                MovimientoEvent.TIPO_MOVIMIENTO_REGISTRADO,
+                m.getId(),
+                m.getProductoId(),
+                m.getProductoCodigo(),
+                m.getProductoNombre(),
+                m.getTipoMovimiento().name(),
+                m.getCantidad(),
+                m.getStockResultante(),
+                stockMinimo,
+                m.getUsuario(),
+                m.getFecha());
     }
 
     public List<MovimientoResponse> listar(Long productoId) {
