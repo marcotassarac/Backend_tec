@@ -29,7 +29,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void handleGeneric_debeRetornar500ConElMensajeYLaRuta() {
+    void handleGeneric_debeRetornar500ConMensajeGenericoYLaRuta() {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRequestURI()).thenReturn("/api/reportes/stock-actual");
 
@@ -38,6 +38,8 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMessage()).isEqualTo("fallo inesperado");
+        assertThat(response.getBody().getMessage())
+                .isEqualTo(GlobalExceptionHandler.MENSAJE_ERROR_INTERNO)
+                .doesNotContain("fallo inesperado");
     }
 }

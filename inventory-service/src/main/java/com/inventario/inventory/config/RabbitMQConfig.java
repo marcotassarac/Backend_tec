@@ -6,6 +6,7 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +23,8 @@ public class RabbitMQConfig {
     public static final String DEAD_LETTER_EXCHANGE = "pedidos.dlx";
     public static final String COLA_INVENTARIO = "cola.inventario";
     public static final String COLA_INVENTARIO_DLQ = "cola.inventario.dlq";
+    /** Exchange donde se publica cada movimiento registrado; routing key movimiento.<rol>. */
+    public static final String MOVIMIENTOS_EXCHANGE = "movimientos.topic";
 
     @Bean
     public DirectExchange pedidosDeadLetterExchange() {
@@ -44,6 +47,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding inventarioDlqBinding() {
         return BindingBuilder.bind(colaInventarioDlq()).to(pedidosDeadLetterExchange()).with(COLA_INVENTARIO_DLQ);
+    }
+
+    @Bean
+    public TopicExchange movimientosExchange() {
+        return ExchangeBuilder.topicExchange(MOVIMIENTOS_EXCHANGE).durable(true).build();
     }
 
     /** Convierte el JSON que publica product-service a objetos Java. */

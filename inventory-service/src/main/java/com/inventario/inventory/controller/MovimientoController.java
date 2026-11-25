@@ -2,6 +2,7 @@ package com.inventario.inventory.controller;
 
 import com.inventario.inventory.dto.MovimientoRequest;
 import com.inventario.inventory.dto.MovimientoResponse;
+import com.inventario.inventory.messaging.MovimientoNotificador;
 import com.inventario.inventory.service.InventoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -18,9 +19,11 @@ import java.util.List;
 public class MovimientoController {
 
     private final InventoryService inventoryService;
+    private final MovimientoNotificador notificador;
 
-    public MovimientoController(InventoryService inventoryService) {
+    public MovimientoController(InventoryService inventoryService, MovimientoNotificador notificador) {
         this.inventoryService = inventoryService;
+        this.notificador = notificador;
     }
 
     @PostMapping
@@ -30,6 +33,7 @@ public class MovimientoController {
         String bearerToken = httpRequest.getHeader("Authorization");
         String usuario = jwt.getSubject();
         MovimientoResponse response = inventoryService.registrarMovimiento(request, bearerToken, usuario);
+        notificador.notificar(response, jwt.getClaimAsString("rol"));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

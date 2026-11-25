@@ -61,11 +61,13 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void handleGeneric_debeRetornar500ConElMensajeDeLaExcepcion() {
+    void handleGeneric_debeRetornar500SinExponerElMensajeTecnico() {
         ResponseEntity<ErrorResponse> response = handler.handleGeneric(
                 new RuntimeException("error inesperado"), mockRequest());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody().getMessage()).isEqualTo("error inesperado");
+        assertThat(response.getBody().getMessage())
+                .isEqualTo(GlobalExceptionHandler.MENSAJE_ERROR_INTERNO)
+                .doesNotContain("error inesperado");
     }
 }

@@ -123,7 +123,7 @@ class CategoriaControllerTest {
 
     @Test
     void eliminar_conIdExistente_debeRetornar204() throws Exception {
-        doNothing().when(categoriaService).eliminar(1L);
+        doNothing().when(categoriaService).eliminar(1L, null);
 
         mockMvc.perform(delete("/api/categorias/1"))
                 .andExpect(status().isNoContent());
@@ -136,6 +136,6 @@ class CategoriaControllerTest {
         mockMvc.perform(get("/api/categorias"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.message").value("fallo inesperado de base de datos"));
+                .andExpect(jsonPath("$.message").value("Ocurrio un error interno. Intenta nuevamente o contacta al administrador"));
     }
 }

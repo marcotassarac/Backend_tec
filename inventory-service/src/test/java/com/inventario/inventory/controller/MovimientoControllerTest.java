@@ -1,5 +1,6 @@
 package com.inventario.inventory.controller;
 
+import com.inventario.inventory.messaging.MovimientoNotificador;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.inventario.inventory.config.SecurityConfig;
 import com.inventario.inventory.dto.MovimientoRequest;
@@ -50,6 +51,9 @@ class MovimientoControllerTest {
 
     @MockBean
     private InventoryService inventoryService;
+
+    @MockBean
+    private MovimientoNotificador notificador;
 
     @Test
     void registrar_conTokenValido_debeRetornar201() throws Exception {

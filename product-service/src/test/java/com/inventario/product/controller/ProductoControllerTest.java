@@ -103,6 +103,15 @@ class ProductoControllerTest {
     }
 
     @Test
+    void categoriaTieneProductos_debeResponderExiste() throws Exception {
+        when(productoService.categoriaTieneProductos(5L)).thenReturn(true);
+
+        mockMvc.perform(get("/api/productos/categoria/5/existe"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.existe").value(true));
+    }
+
+    @Test
     void eliminar_debeRetornar204() throws Exception {
         mockMvc.perform(delete("/api/productos/1"))
                 .andExpect(status().isNoContent());

@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/productos")
@@ -25,6 +26,12 @@ public class ProductoController {
     @GetMapping
     public ResponseEntity<List<ProductoResponse>> listar(HttpServletRequest request) {
         return ResponseEntity.ok(productoService.listar(request.getHeader("Authorization")));
+    }
+
+    /** Usado por category-service para no eliminar una categoria que todavia tiene productos. */
+    @GetMapping("/categoria/{categoriaId}/existe")
+    public ResponseEntity<Map<String, Boolean>> categoriaTieneProductos(@PathVariable Long categoriaId) {
+        return ResponseEntity.ok(Map.of("existe", productoService.categoriaTieneProductos(categoriaId)));
     }
 
     @GetMapping("/{id}")

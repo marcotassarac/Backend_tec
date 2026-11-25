@@ -67,6 +67,9 @@ public class ProductoService {
 
     public ProductoResponse actualizar(Long id, ProductoRequest request) {
         Producto producto = buscarOFallar(id);
+        if (productoRepository.existsByCodigoIgnoreCaseAndIdNot(request.getCodigo(), id)) {
+            throw new BusinessException("Ya existe un producto con el codigo " + request.getCodigo());
+        }
         producto.setCodigo(request.getCodigo());
         producto.setNombre(request.getNombre());
         producto.setDescripcion(request.getDescripcion());
@@ -81,9 +84,21 @@ public class ProductoService {
         return toResponse(productoRepository.save(producto), null);
     }
 
+    /**
+     * Baja logica: el producto queda inactivo en vez de borrarse, para que su historial de
+     * movimientos (kardex) siga consultable en Reportes y no se pierda la trazabilidad.
+     */
     public void eliminar(Long id) {
         Producto producto = buscarOFallar(id);
-        productoRepository.delete(producto);
+        producto.setActivo(false);
+        producto.setFechaActualizacion(LocalDateTime.now());
+        Producto guardado = productoRepository.save(producto);
+        publicarEvento("PRODUCTO_ELIMINADO", guardado);
+    }
+
+    /** Lo consulta category-service antes de eliminar una categoria. */
+    public boolean categoriaTieneProductos(Long categoriaId) {
+        return productoRepository.existsByCategoriaId(categoriaId);
     }
 
     /** Usado por inventory-service para reflejar un movimiento de entrada/salida en el stock. */

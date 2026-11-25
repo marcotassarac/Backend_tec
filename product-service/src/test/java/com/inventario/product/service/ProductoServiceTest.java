@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 /**
  * Pruebas unitarias de ProductoService, con repositorio/cliente/rabbit mockeados para
@@ -139,32 +140,42 @@ class ProductoServiceTest {
     }
 
     /**
-     * DEFECTO REAL DETECTADO: a diferencia de crear(), actualizar() nunca llama a
-     * existsByCodigoIgnoreCase, por lo que no impide dejar a un producto con el mismo
-     * codigo que otro ya existente. Este test documenta el comportamiento CORRECTO que
-     * se espera (debiera rechazar el duplicado con BusinessException) y FALLA hoy porque
-     * la implementacion actual no lo hace - es el hallazgo de calidad que exige el 2.2/2.3
-     * de la pauta, no un error del test.
+     * DEF-03 (UAT Ciclo 1, criterio CA-17): actualizar() no validaba el codigo duplicado y la base de
+     * datos respondia con un error 500 que exponia el SQL. Corregido: se rechaza con un mensaje claro.
      */
     @Test
-    void actualizar_conCodigoDuplicadoDeOtroProducto_deberiaRechazarPeroNoLoHace() {
+    void actualizar_conCodigoDuplicadoDeOtroProducto_debeRechazarConMensajeClaro() {
         productoService = buildService();
         Producto productoAEditar = Producto.builder().id(2L).codigo("PROD-002").nombre("Mouse")
                 .precio(BigDecimal.ONE).stock(5).stockMinimo(1).activo(true).build();
         when(productoRepository.findById(2L)).thenReturn(Optional.of(productoAEditar));
-        // El codigo "PROD-001" ya es usado por OTRO producto (id 1), por eso deberia rechazarse
-        when(productoRepository.existsByCodigoIgnoreCase("PROD-001")).thenReturn(true);
-        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(productoRepository.existsByCodigoIgnoreCaseAndIdNot("PROD-001", 2L)).thenReturn(true);
 
         ProductoRequest request = new ProductoRequest("PROD-001", "Mouse", null, 1L,
                 BigDecimal.ONE, 5, 1, true);
 
         assertThatThrownBy(() -> productoService.actualizar(2L, request))
-                .as("actualizar() deberia validar codigo duplicado igual que crear(), pero hoy no lo hace")
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ya existe un producto con el codigo PROD-001");
+        verify(productoRepository, never()).save(any(Producto.class));
     }
 
     @Test
+    void actualizar_manteniendoSuPropioCodigo_debeGuardar() {
+        productoService = buildService();
+        Producto productoAEditar = Producto.builder().id(2L).codigo("PROD-002").nombre("Mouse")
+                .precio(BigDecimal.ONE).stock(5).stockMinimo(1).activo(true).build();
+        when(productoRepository.findById(2L)).thenReturn(Optional.of(productoAEditar));
+        when(productoRepository.existsByCodigoIgnoreCaseAndIdNot("PROD-002", 2L)).thenReturn(false);
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProductoRequest request = new ProductoRequest("PROD-002", "Mouse gamer", null, 1L,
+                BigDecimal.TEN, 5, 1, true);
+
+        assertThat(productoService.actualizar(2L, request).getNombre()).isEqualTo("Mouse gamer");
+    }
+
+        @Test
     void listar_conBearerToken_debeConsultarElNombreDeCategoriaParaCadaProducto() {
         productoService = buildService();
         Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
@@ -191,15 +202,28 @@ class ProductoServiceTest {
     }
 
     @Test
-    void eliminar_conIdExistente_debeBorrarElProducto() {
+    void eliminar_conIdExistente_debeDesactivarloSinBorrarlo() {
         productoService = buildService();
         Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
                 .precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
         when(productoRepository.findById(1L)).thenReturn(Optional.of(producto));
 
+        when(productoRepository.save(any(Producto.class))).thenAnswer(inv -> inv.getArgument(0));
+
         productoService.eliminar(1L);
 
-        verify(productoRepository).delete(producto);
+        // DEF-05 (UAT Ciclo 1, CA-19): baja logica, el producto y su kardex se conservan
+        assertThat(producto.isActivo()).isFalse();
+        verify(productoRepository).save(producto);
+        verify(productoRepository, never()).delete(any(Producto.class));
+    }
+
+    @Test
+    void categoriaTieneProductos_debeConsultarAlRepositorio() {
+        productoService = buildService();
+        when(productoRepository.existsByCategoriaId(4L)).thenReturn(true);
+
+        assertThat(productoService.categoriaTieneProductos(4L)).isTrue();
     }
 
     @Test

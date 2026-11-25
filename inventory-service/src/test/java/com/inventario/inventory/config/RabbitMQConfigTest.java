@@ -52,4 +52,12 @@ class RabbitMQConfigTest {
     void jsonMessageConverter_debeRetornarUnConversorJackson() {
         assertThat(config.jsonMessageConverter()).isInstanceOf(Jackson2JsonMessageConverter.class);
     }
+
+    @Test
+    void movimientosExchange_debeSerTopicDurable() {
+        var exchange = config.movimientosExchange();
+        assertThat(exchange.getName()).isEqualTo(RabbitMQConfig.MOVIMIENTOS_EXCHANGE);
+        assertThat(exchange.getType()).isEqualTo("topic");
+        assertThat(exchange.isDurable()).isTrue();
+    }
 }

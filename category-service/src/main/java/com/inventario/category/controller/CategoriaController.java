@@ -41,8 +41,9 @@ public class CategoriaController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        categoriaService.eliminar(id);
+    public ResponseEntity<Void> eliminar(@PathVariable Long id,
+                                         @RequestHeader(value = "Authorization", required = false) String authorization) {
+        categoriaService.eliminar(id, authorization);
         return ResponseEntity.noContent().build();
     }
 }

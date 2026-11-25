@@ -22,7 +22,7 @@ class DataSeederTest {
 
     @BeforeEach
     void setUp() {
-        dataSeeder = new DataSeeder(usuarioRepository);
+        dataSeeder = new DataSeeder(usuarioRepository, "admin123", "operador123");
     }
 
     @Test

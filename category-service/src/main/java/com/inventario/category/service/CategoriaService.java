@@ -1,5 +1,6 @@
 package com.inventario.category.service;
 
+import com.inventario.category.client.ProductClient;
 import com.inventario.category.dto.CategoriaRequest;
 import com.inventario.category.dto.CategoriaResponse;
 import com.inventario.category.entity.Categoria;
@@ -14,9 +15,11 @@ import java.util.List;
 public class CategoriaService {
 
     private final CategoriaRepository categoriaRepository;
+    private final ProductClient productClient;
 
-    public CategoriaService(CategoriaRepository categoriaRepository) {
+    public CategoriaService(CategoriaRepository categoriaRepository, ProductClient productClient) {
         this.categoriaRepository = categoriaRepository;
+        this.productClient = productClient;
     }
 
     public List<CategoriaResponse> listar() {
@@ -41,6 +44,9 @@ public class CategoriaService {
 
     public CategoriaResponse actualizar(Long id, CategoriaRequest request) {
         Categoria categoria = buscarOFallar(id);
+        if (categoriaRepository.existsByNombreIgnoreCaseAndIdNot(request.getNombre(), id)) {
+            throw new BusinessException("Ya existe una categoria con ese nombre");
+        }
         categoria.setNombre(request.getNombre());
         categoria.setDescripcion(request.getDescripcion());
         if (request.getActivo() != null) {
@@ -49,8 +55,12 @@ public class CategoriaService {
         return toResponse(categoriaRepository.save(categoria));
     }
 
-    public void eliminar(Long id) {
+    public void eliminar(Long id, String bearerToken) {
         Categoria categoria = buscarOFallar(id);
+        if (productClient.categoriaTieneProductos(id, bearerToken)) {
+            throw new BusinessException("No se puede eliminar la categoria \"" + categoria.getNombre()
+                    + "\" porque tiene productos asociados. Desactivala o reasigna sus productos primero");
+        }
         categoriaRepository.delete(categoria);
     }
 

@@ -1,5 +1,6 @@
 package com.inventario.category.service;
 
+import com.inventario.category.client.ProductClient;
 import com.inventario.category.dto.CategoriaRequest;
 import com.inventario.category.dto.CategoriaResponse;
 import com.inventario.category.entity.Categoria;
@@ -20,12 +21,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class CategoriaServiceTest {
 
     @Mock
     private CategoriaRepository categoriaRepository;
+
+    @Mock
+    private ProductClient productClient;
 
     @InjectMocks
     private CategoriaService categoriaService;
@@ -60,29 +65,23 @@ class CategoriaServiceTest {
     void eliminar_conIdInexistente_debeLanzarResourceNotFoundException() {
         when(categoriaRepository.findById(404L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> categoriaService.eliminar(404L))
+        assertThatThrownBy(() -> categoriaService.eliminar(404L, "Bearer token"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-    /**
-     * DEFECTO REAL DETECTADO (mismo patron que en product-service): actualizar() nunca
-     * verifica existsByNombreIgnoreCase, asi que permite dejar dos categorias con el
-     * mismo nombre. Este test documenta el comportamiento correcto esperado y FALLA hoy
-     * porque la implementacion actual no valida el duplicado al editar.
-     */
+    /** DEF-02 (UAT Ciclo 1, CA-12): editar con el nombre de otra categoria se rechaza con mensaje claro. */
     @Test
-    void actualizar_conNombreDuplicadoDeOtraCategoria_deberiaRechazarPeroNoLoHace() {
+    void actualizar_conNombreDuplicadoDeOtraCategoria_debeRechazarConMensajeClaro() {
         Categoria categoriaAEditar = Categoria.builder().id(2L).nombre("Perifericos").activo(true).build();
         when(categoriaRepository.findById(2L)).thenReturn(Optional.of(categoriaAEditar));
-        // "Electronica" ya es el nombre de OTRA categoria (id 1)
-        when(categoriaRepository.existsByNombreIgnoreCase("Electronica")).thenReturn(true);
-        when(categoriaRepository.save(any(Categoria.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(categoriaRepository.existsByNombreIgnoreCaseAndIdNot("Electronica", 2L)).thenReturn(true);
 
         CategoriaRequest request = new CategoriaRequest("Electronica", null, true);
 
         assertThatThrownBy(() -> categoriaService.actualizar(2L, request))
-                .as("actualizar() deberia validar nombre duplicado igual que crear(), pero hoy no lo hace")
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ya existe una categoria con ese nombre");
+        verify(categoriaRepository, never()).save(any(Categoria.class));
     }
 
     @Test
@@ -149,7 +148,6 @@ class CategoriaServiceTest {
     @Test
     void crear_conActivoNulo_debeCrearComoActivaPorDefecto() {
         CategoriaRequest request = new CategoriaRequest("Jardin", null, null);
-        when(categoriaRepository.existsByNombreIgnoreCase("Jardin")).thenReturn(false);
         when(categoriaRepository.save(any(Categoria.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CategoriaResponse response = categoriaService.crear(request);
@@ -160,7 +158,6 @@ class CategoriaServiceTest {
     @Test
     void crear_conActivoFalse_debeCrearComoInactiva() {
         CategoriaRequest request = new CategoriaRequest("Descontinuados", null, false);
-        when(categoriaRepository.existsByNombreIgnoreCase("Descontinuados")).thenReturn(false);
         when(categoriaRepository.save(any(Categoria.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CategoriaResponse response = categoriaService.crear(request);
@@ -173,8 +170,23 @@ class CategoriaServiceTest {
         Categoria categoria = Categoria.builder().id(6L).nombre("Borrame").activo(true).build();
         when(categoriaRepository.findById(6L)).thenReturn(Optional.of(categoria));
 
-        categoriaService.eliminar(6L);
+        when(productClient.categoriaTieneProductos(6L, "Bearer token")).thenReturn(false);
+
+        categoriaService.eliminar(6L, "Bearer token");
 
         verify(categoriaRepository).delete(categoria);
+    }
+
+    /** DEF-04 (UAT Ciclo 1, CA-13): una categoria con productos no se elimina. */
+    @Test
+    void eliminar_categoriaConProductos_debeRechazarSinBorrar() {
+        Categoria categoria = Categoria.builder().id(7L).nombre("Ferreteria").activo(true).build();
+        when(categoriaRepository.findById(7L)).thenReturn(Optional.of(categoria));
+        when(productClient.categoriaTieneProductos(7L, "Bearer token")).thenReturn(true);
+
+        assertThatThrownBy(() -> categoriaService.eliminar(7L, "Bearer token"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("tiene productos asociados");
+        verify(categoriaRepository, never()).delete(any(Categoria.class));
     }
 }
