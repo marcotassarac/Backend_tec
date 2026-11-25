@@ -110,7 +110,7 @@ class FlujosDeNegocioTest {
         // Aunque el operador navegue directo por URL, la pagina debe bloquear el contenido.
         driver.get(BASE_URL + "/notificaciones");
         WebElement restriccion = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//*[contains(text(),'Esta seccion es solo para el rol ADMIN')]")));
+                By.xpath("//*[contains(text(),'Esta sección es solo para el rol ADMIN')]")));
         assertTrue(restriccion.isDisplayed());
         assertFalse(driver.getPageSource().contains("Azure Service Bus"));
     }

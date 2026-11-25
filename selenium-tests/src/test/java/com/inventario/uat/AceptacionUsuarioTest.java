@@ -242,7 +242,7 @@ class AceptacionUsuarioTest {
     @DisplayName("CA-04 Cerrar sesion bloquea el acceso a paginas internas")
     void ca04() {
         loginOk("operador", "operador123");
-        click(By.xpath("//button[normalize-space()='Cerrar sesion']"));
+        click(By.xpath("//button[normalize-space()='Cerrar sesión']"));
         wait.until(ExpectedConditions.urlContains("/login"));
         driver.get(WEB + "/productos");
         wait.until(ExpectedConditions.urlContains("/login"));
@@ -272,9 +272,9 @@ class AceptacionUsuarioTest {
         loginOk("admin", "admin123");
         driver.get(WEB + "/categorias");
         esperarCarga();
-        click(By.xpath("//button[normalize-space()='+ Nueva categoria']"));
+        click(By.xpath("//button[normalize-space()='+ Nueva categoría']"));
         escribir(campoDelModal("Nombre"), nombre);
-        escribir(campoDelModal("Descripcion"), "Herramientas y articulos de ferreteria");
+        escribir(campoDelModal("Descripción"), "Herramientas y articulos de ferreteria");
         click(By.xpath("//button[@type='submit' and normalize-space()='Guardar']"));
         WebElement fila = fila(nombre);
         nota("Fila creada: " + fila.getText());
@@ -291,7 +291,7 @@ class AceptacionUsuarioTest {
         loginOk("admin", "admin123");
         driver.get(WEB + "/categorias");
         esperarCarga();
-        click(By.xpath("//button[normalize-space()='+ Nueva categoria']"));
+        click(By.xpath("//button[normalize-space()='+ Nueva categoría']"));
         escribir(campoDelModal("Nombre"), nombre);
         click(By.xpath("//button[@type='submit' and normalize-space()='Guardar']"));
         String error = mensajeDeError();
@@ -313,7 +313,7 @@ class AceptacionUsuarioTest {
         esperarCarga();
         clickEn(fila(nombre), "Editar");
         escribir(campoDelModal("Nombre"), nuevo);
-        escribir(campoDelModal("Descripcion"), "Descripcion actualizada en UAT");
+        escribir(campoDelModal("Descripción"), "Descripcion actualizada en UAT");
         click(By.xpath("//button[@type='submit' and normalize-space()='Guardar']"));
         WebElement fila = fila(nuevo);
         nota("Fila editada: " + fila.getText());
@@ -392,11 +392,11 @@ class AceptacionUsuarioTest {
         driver.get(WEB + "/productos");
         esperarCarga();
         click(By.xpath("//button[normalize-space()='+ Nuevo producto']"));
-        escribir(campoDelModal("Codigo"), codigo);
+        escribir(campoDelModal("Código"), codigo);
         escribir(campoDelModal("Nombre"), "Taladro percutor UAT");
         escribir(campoDelModal("Precio"), "45990");
         escribir(campoDelModal("Stock inicial"), "12");
-        escribir(campoDelModal("Stock minimo"), "3");
+        escribir(campoDelModal("Stock mínimo"), "3");
         click(By.xpath("//button[@type='submit' and normalize-space()='Guardar']"));
         WebElement fila = fila(codigo);
         nota("Fila creada: " + fila.getText());
@@ -417,7 +417,7 @@ class AceptacionUsuarioTest {
         driver.get(WEB + "/productos");
         esperarCarga();
         click(By.xpath("//button[normalize-space()='+ Nuevo producto']"));
-        escribir(campoDelModal("Codigo"), codigo);
+        escribir(campoDelModal("Código"), codigo);
         escribir(campoDelModal("Nombre"), "Duplicado UAT");
         escribir(campoDelModal("Precio"), "1000");
         click(By.xpath("//button[@type='submit' and normalize-space()='Guardar']"));
@@ -441,7 +441,7 @@ class AceptacionUsuarioTest {
         driver.get(WEB + "/productos");
         esperarCarga();
         clickEn(fila(b), "Editar");
-        escribir(campoDelModal("Codigo"), a);
+        escribir(campoDelModal("Código"), a);
         click(By.xpath("//button[@type='submit' and normalize-space()='Guardar']"));
         String error = mensajeDeError();
         nota("Mensaje mostrado al editar '" + b + "' con el codigo '" + a + "': " + error);
@@ -704,7 +704,7 @@ class AceptacionUsuarioTest {
             fail("El ADMIN no ve el movimiento del operador en Notificaciones");
         }
         nota("Buzon ADMIN: " + driver.findElement(filaMovimiento).getText());
-        click(By.xpath("//button[contains(.,'Auditoria completa')]"));
+        click(By.xpath("//button[contains(.,'Auditoría completa')]"));
         wait.until(ExpectedConditions.visibilityOfElementLocated(filaMovimiento));
         nota("Auditoria: " + driver.findElement(filaMovimiento).getText());
     }
@@ -757,7 +757,7 @@ class AceptacionUsuarioTest {
         driver.get(WEB + "/seguridad");
         click(By.xpath("//button[contains(.,'Configurar') or contains(.,'Activar')]"));
         WebElement secreto = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//p[contains(.,'Codigo manual')]/following-sibling::*[1]")));
+                By.xpath("//p[contains(.,'Código manual')]/following-sibling::*[1]")));
         secreto2fa = secreto.getText().trim();
         Totp.esperarVentanaSegura();
         escribir(By.id("setup-code"), Totp.codigo(secreto2fa));
@@ -810,7 +810,7 @@ class AceptacionUsuarioTest {
         String ok = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//*[contains(text(),'desactivada')]"))).getText();
         nota("Mensaje: " + ok);
-        click(By.xpath("//button[normalize-space()='Cerrar sesion']"));
+        click(By.xpath("//button[normalize-space()='Cerrar sesión']"));
         wait.until(ExpectedConditions.urlContains("/login"));
         loginOk("operador", "operador123");
         nota("Login posterior sin codigo -> " + driver.getCurrentUrl());

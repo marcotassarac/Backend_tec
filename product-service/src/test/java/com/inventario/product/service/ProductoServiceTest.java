@@ -17,6 +17,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 /**
  * Pruebas unitarias de ProductoService, con repositorio/cliente/rabbit mockeados para
@@ -175,18 +177,48 @@ class ProductoServiceTest {
         assertThat(productoService.actualizar(2L, request).getNombre()).isEqualTo("Mouse gamer");
     }
 
-        @Test
-    void listar_conBearerToken_debeConsultarElNombreDeCategoriaParaCadaProducto() {
+    @Test
+    void listar_conBearerToken_debePedirLasCategoriasUnaSolaVezParaTodoElListado() {
+        // EST-01: antes se hacia una llamada a category-service por cada producto (N+1)
         productoService = buildService();
-        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+        Producto teclado = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
                 .categoriaId(5L).precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
-        when(productoRepository.findAll()).thenReturn(List.of(producto));
-        when(categoryClient.obtenerNombreCategoria(5L, "Bearer token-x")).thenReturn("Perifericos");
+        Producto mouse = Producto.builder().id(2L).codigo("PROD-101").nombre("Mouse")
+                .categoriaId(5L).precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findAll()).thenReturn(List.of(teclado, mouse));
+        when(categoryClient.obtenerNombresCategorias("Bearer token-x")).thenReturn(Map.of(5L, "Perifericos"));
 
         List<ProductoResponse> resultado = productoService.listar("Bearer token-x");
 
-        assertThat(resultado).hasSize(1);
-        assertThat(resultado.get(0).getCategoriaNombre()).isEqualTo("Perifericos");
+        assertThat(resultado).hasSize(2);
+        assertThat(resultado).extracting(ProductoResponse::getCategoriaNombre).containsOnly("Perifericos");
+        verify(categoryClient, times(1)).obtenerNombresCategorias("Bearer token-x");
+        verify(categoryClient, never()).obtenerNombreCategoria(any(), any());
+    }
+
+    @Test
+    void obtenerPorId_conBearerToken_debeIncluirElNombreDeLaCategoria() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .categoriaId(5L).precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findById(1L)).thenReturn(java.util.Optional.of(producto));
+        when(categoryClient.obtenerNombreCategoria(5L, "Bearer token-x")).thenReturn("Perifericos");
+
+        assertThat(productoService.obtenerPorId(1L, "Bearer token-x").getCategoriaNombre()).isEqualTo("Perifericos");
+    }
+
+    @Test
+    void listar_conCategoriaQueNoEstaEnElCache_debeConsultarSoloEsaCategoria() {
+        productoService = buildService();
+        Producto producto = Producto.builder().id(1L).codigo("PROD-100").nombre("Teclado")
+                .categoriaId(9L).precio(BigDecimal.TEN).stock(10).stockMinimo(2).activo(true).build();
+        when(productoRepository.findAll()).thenReturn(List.of(producto));
+        when(categoryClient.obtenerNombresCategorias("Bearer token-x")).thenReturn(Map.of(5L, "Perifericos"));
+        when(categoryClient.obtenerNombreCategoria(9L, "Bearer token-x")).thenReturn("Nueva");
+
+        List<ProductoResponse> resultado = productoService.listar("Bearer token-x");
+
+        assertThat(resultado.get(0).getCategoriaNombre()).isEqualTo("Nueva");
     }
 
     @Test

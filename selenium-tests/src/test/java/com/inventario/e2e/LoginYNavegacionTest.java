@@ -91,7 +91,7 @@ class LoginYNavegacionTest {
         login("operador", "operador123");
         wait.until(ExpectedConditions.urlContains("/menu"));
 
-        driver.findElement(By.xpath("//button[contains(text(),'Cerrar sesion')]")).click();
+        driver.findElement(By.xpath("//button[contains(text(),'Cerrar sesión')]")).click();
         wait.until(ExpectedConditions.urlContains("/login"));
 
         assertEquals(BASE_URL + "/login", driver.getCurrentUrl());

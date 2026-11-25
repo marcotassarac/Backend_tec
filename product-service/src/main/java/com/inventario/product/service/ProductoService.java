@@ -37,9 +37,22 @@ public class ProductoService {
     }
 
     public List<ProductoResponse> listar(String bearerToken) {
+        // EST-01: una sola llamada a category-service para todo el listado (antes, una por producto)
+        Map<Long, String> nombres = bearerToken != null
+                ? categoryClient.obtenerNombresCategorias(bearerToken)
+                : Map.of();
         return productoRepository.findAll().stream()
-                .map(p -> toResponse(p, bearerToken))
+                .map(p -> construir(p, nombreCategoria(p, nombres, bearerToken)))
                 .toList();
+    }
+
+    private String nombreCategoria(Producto producto, Map<Long, String> nombres, String bearerToken) {
+        String nombre = nombres.get(producto.getCategoriaId());
+        if (nombre == null && bearerToken != null) {
+            // categoria creada despues de la ultima carga del cache: se consulta solo esa
+            return categoryClient.obtenerNombreCategoria(producto.getCategoriaId(), bearerToken);
+        }
+        return nombre;
     }
 
     public ProductoResponse obtenerPorId(Long id, String bearerToken) {
@@ -153,7 +166,10 @@ public class ProductoService {
         String categoriaNombre = bearerToken != null
                 ? categoryClient.obtenerNombreCategoria(producto.getCategoriaId(), bearerToken)
                 : null;
+        return construir(producto, categoriaNombre);
+    }
 
+    private ProductoResponse construir(Producto producto, String categoriaNombre) {
         return ProductoResponse.builder()
                 .id(producto.getId())
                 .codigo(producto.getCodigo())
